@@ -1,0 +1,24 @@
+{
+  "name": "workshop-backend",
+  "main": "src/server.ts",
+  "compatibility_date": "2025-07-01",
+  "compatibility_flags": ["experimental", "enable_ctx_exports"],
+  "services": [
+    {
+      "binding": "GATEKEEPER_GOOGLE",
+      "service": "gatekeeper-google",
+      "entrypoint": "GatekeeperVendor"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v0",
+      "new_sqlite_classes": [ "UserDurableObject", "OverseerDurableObject" ]
+    }
+  ],
+  "worker_loaders": [
+    {
+      "binding": "LOADER"
+    }
+  ]
+}

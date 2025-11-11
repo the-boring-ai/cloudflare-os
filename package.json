@@ -1,0 +1,15 @@
+{
+  "name": "minions",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm run --recursive build",
+    "dev-client": "cd packages/workshop-frontend && pnpm run dev",
+    "dev-server": "wrangler dev -c wrangler.jsonc -c packages/workshop-backend/wrangler.jsonc -c packages/gatekeeper-google/wrangler.jsonc",
+    "clean": "pnpm run --recursive clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.47.0"
+  }
+}
