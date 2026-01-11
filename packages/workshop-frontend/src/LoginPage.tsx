@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { RpcStub } from 'capnweb'
 import { PublicApi } from '@gadgets/workshop-shared/api'
-import { Card, Form, Input, Button, Typography, Alert, Spin } from 'antd'
+import { Card, Form, Input, Button, Typography, Alert } from 'antd'
+import { hashPassword } from './passwordHash'
 
 const { Title, Text } = Typography
 
@@ -19,7 +21,8 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
     setError(null)
 
     try {
-      const token = await rpcStub.login(values.username, values.password)
+      const passwordHash = await hashPassword(values.username, values.password)
+      const token = await rpcStub.login(values.username, passwordHash)
       if (token) {
         localStorage.setItem('authToken', token)
         // Trigger re-authentication check in parent
@@ -113,6 +116,13 @@ export default function LoginPage({ rpcStub, onLoginSuccess }: LoginPageProps) {
             </Button>
           </Form.Item>
         </Form>
+
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <Text type="secondary">
+            Don't have an account?{' '}
+            <Link to="/signup">Create one</Link>
+          </Text>
+        </div>
       </Card>
     </div>
   )
