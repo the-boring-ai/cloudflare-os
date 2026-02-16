@@ -9,6 +9,7 @@ declare namespace Cloudflare {
 	interface Env {
 		LOADER: WorkerLoader;
 		GATEKEEPER_GOOGLE: Service /* entrypoint GatekeeperVendor from gatekeeper-google */;
+		GATEKEEPER_EMAIL: Service /* entrypoint GatekeeperVendor from gatekeeper-email */;
 		WORKERS_AI: Ai;
 	}
 }
