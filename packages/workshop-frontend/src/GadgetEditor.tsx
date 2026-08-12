@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react'
 import { RpcStub, RpcTarget } from 'capnweb'
 import { useAuthenticatedApi } from './AuthContext'
+import { useConnectionLost } from './RpcContext'
 import UserMenu from './components/UserMenu'
 import SiteLogo from './components/SiteLogo'
 
@@ -447,6 +448,9 @@ export default function GadgetEditor() {
   isEditingTitleRef.current = isEditingTitle
   const [titleInput, setTitleInput] = useState('')
 
+  // The workspace-level flag covers reopen failures; the socket-level flag covers the outage
+  // window itself, during which the dead stub stays published and no reopen is attempted yet.
+  const rpcConnectionLost = useConnectionLost()
   const {
     overseer,
     metadata,
@@ -1418,7 +1422,7 @@ export default function GadgetEditor() {
             onViewActivity={openActivity}
           />
 
-          {connectionLost && <ReconnectingChip />}
+          {(connectionLost || rpcConnectionLost) && <ReconnectingChip />}
 
           <WorkshopIconButton
             onClick={() => setShareModalOpen(true)}
