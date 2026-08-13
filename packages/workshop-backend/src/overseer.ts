@@ -1,7 +1,7 @@
 import { RpcCompatible, RpcStub, RpcTarget } from "capnweb";
 import { validateRpc } from "capnweb-validate";
 import { Overseer, GadgetMetadata, UiBundle, WorkpieceId, WorkpieceSummary, WorkpiecesSubscriber, GadgetClient, GadgetBindingInfo, GatekeeperClient, ActionState, ActionLogEntry, ActionsSubscriber, CodeUpdate, CodeSubscriber, AiChatMetadata, AiChatMessage, AiChatHistoryPage, AiChatSubscriber, AiChatAuthorInfo, AiModelConfig, AiChatMessageBody, AgentSpawnerConfig, ConsoleLogSubscriber, ConsoleLogEvent, CapsuleSpecifier, CollaboratorInfo, CollaboratorRole, AffectedCollaborator, ShareLinkInfo, GatekeeperCreationSpec, ObserverConfigCallback, ObserverBindingNeed, ObserverBindingFailure, BlueprintBindingAnnotation, BlueprintBinding, BlueprintMetadata, BlueprintOutput, MessageFormatRef, isOutputIcon, SpawnerEnvTarget, BlueprintGadgetSummary, AiChatStreamEvent, BlueprintScreenshotUpload, BLUEPRINT_SCREENSHOT_R2_PREFIX, blueprintScreenshotUrl, ChatAttachmentUpload, ChatAttachmentHandle, ChatAttachmentRef, BoundHookInfo, PreApprovableAction, PresenceParticipant, PresenceSubscriber, SlashCommandChoice, SlashCommandRequest, validateBindingName, createOpenGadgetError, OPEN_GADGET_ERROR_CODES, resolveSiteName } from '@gadgets/workshop-shared/api';
-import { Gatekeeper, HookInitiator, ResourceDescription, ApprovalQueue, ActionDescription, ObservationAuthorizer, ObservationDescription, VendorDescription, SupportedResource, resolveRequestedResource, HookController, HookDescription, AGENT_CATALOG_MAX_ENTRIES, ActionKind } from "@gadgets/workshop-shared/gatekeeper";
+import { getActionInvalidationReason, Gatekeeper, HookInitiator, ResourceDescription, ApprovalQueue, ActionDescription, ObservationAuthorizer, ObservationDescription, VendorDescription, SupportedResource, resolveRequestedResource, HookController, HookDescription, AGENT_CATALOG_MAX_ENTRIES, ActionKind } from "@gadgets/workshop-shared/gatekeeper";
 import {
   DurableObject, WorkerEntrypoint, RpcStub as NativeRpcStub,
   RpcTarget as NativeRpcTarget, restore,
@@ -35,7 +35,7 @@ import { checkUsageAndBalance } from "./ai-gateway-billing/limits/usage-checker"
 import { completeAgentCatalogSnapshot, normalizeAgentCatalog } from "./agent-catalog";
 import { refreshCachedBalance } from "./ai-gateway-billing/cloudflare/connection-service";
 import { SharingManager, SharingCaller, CollaboratorRecord, ShareKeyRecord } from "./sharing";
-import { AutoApprovalDrainer } from "./auto-approval";
+import { AutoApprovalDrainer, clearAutoApprovalRules } from "./auto-approval";
 import { collectSlashCommands, invokeSlashCommand } from "./slash-commands";
 import { createWorkshopLogger, obsContext, traced } from "./observability";
 import { wrapDoStubForTelemetry } from "./do-telemetry";
@@ -520,8 +520,12 @@ export type ActionRecord = {
   appliedAt?: Date;
   action: number;  // action key assigned by the gatekeeper, passed back on apply/reject/revert
   description: ActionDescription;
-  resolvedBy?: AiChatAuthorInfo;  // set when resolved (approved/rejected); absent while pending (or legacy)
-  autoApproved?: boolean;         // set when applied by an auto-approval rule rather than a human
+  /** Set when resolved (approved/rejected); absent while pending or on legacy records. */
+  resolvedBy?: AiChatAuthorInfo;
+  /** True when applied by an auto-approval rule rather than a human. */
+  autoApproved?: boolean;
+  /** Why the action became invalid before dispatch. */
+  invalidationReason?: string;
 } | {
   type: "observation";
   description: ObservationDescription;
@@ -730,6 +734,7 @@ function actionRecordToLog(record: ActionRecord): ActionLogEntry {
         description: record.description,
         resolvedBy: record.resolvedBy,
         autoApproved: record.autoApproved,
+        invalidationReason: record.invalidationReason,
       };
     case "bindHook":
       return {
@@ -2577,14 +2582,35 @@ class OverseerImpl implements AgentHooks {
   // requiring them here guarantees the audit log always records the resolving user and whether it
   // was applied automatically. For an auto-approval, `resolvedBy` is the user who enabled the rule.
   async applyPendingAction(record: ActionRecord & {type: "action"},
-                           resolvedBy: AiChatAuthorInfo, autoApproved: boolean): Promise<void> {
+                           resolvedBy: AiChatAuthorInfo, autoApproved: boolean)
+      : Promise<"approved" | "invalidated"> {
     let gatekeeper = this.getGatekeeperFacet(record.gatekeeperId);
-    await gatekeeper.applyAction(record.action);
+    let invalidationReason: string | undefined;
+    try {
+      await gatekeeper.applyAction(record.action);
+    } catch (error) {
+      invalidationReason = getActionInvalidationReason(error);
+      if (invalidationReason === undefined) throw error;
+    }
+    if (invalidationReason !== undefined) {
+      // A rolled-back backend will not recognize the reason as an in-order barrier. Removing every
+      // rule makes its next drain stop at a manual gate instead of applying a successor past it.
+      clearAutoApprovalRules(this.storage, record.gatekeeperId);
+      // Keep the established wire state so an older browser renders this as denied rather than
+      // claiming the undispatched action was approved. The reason distinguishes invalidation.
+      record.state = "rejected";
+      record.appliedAt = new Date();
+      record.resolvedBy = resolvedBy;
+      record.invalidationReason = invalidationReason;
+      this.storage.actions.put(record);
+      return "invalidated";
+    }
     record.state = "approved";
     record.appliedAt = new Date();
     record.resolvedBy = resolvedBy;
     record.autoApproved = autoApproved;
     this.storage.actions.put(record);
+    return "approved";
   }
 
   // Apply all currently-eligible pending actions of the given gatekeeper, in ascending id order.
@@ -7749,7 +7775,8 @@ class OverseerClientInterface extends RpcTarget implements Overseer {
     // Resolve the approver's identity before applying, so a failed profile fetch can't leave the
     // action applied in the world but still "pending" in storage.
     let profile = await this.#getClientProfile();
-    await this.impl.applyPendingAction(action, profile, false);
+    const outcome = await this.impl.applyPendingAction(action, profile, false);
+    if (outcome === "invalidated") return;
 
     // If this was an awaited agent action, resume only after all awaited actions in the turn are
     // approved. If applyPendingAction throws, the action stays pending and the turn stays suspended.
@@ -7865,7 +7892,7 @@ class OverseerClientInterface extends RpcTarget implements Overseer {
     // Only resume when every awaited action in the turn has been decided and all were approved.
     if (awaited.length === 0) return;                       // No awaited action in current turn.
     if (awaited.some(r => r.state === "pending")) return;   // Still waiting on a decision.
-    if (awaited.some(r => r.state === "rejected")) return;  // Denial leaves the turn ended.
+    if (awaited.some(r => r.state === "rejected")) return;
 
     // Persist one note for replay; raw action cards are not surfaced to the LLM. Concurrent
     // approvals could both pass the gate above and append duplicate notes (the DO input gate is

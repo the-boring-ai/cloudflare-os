@@ -89,7 +89,7 @@ export async function withClient<T>(
   env: ConnectionEnv,
   account: ConnectionAccount,
   endpoint: string,
-  fn: (client: McpClient) => Promise<T>,
+  fn: (client: McpClient, connectionGeneration: number) => Promise<T>,
   options: WithClientOptions = {},
 ): Promise<T> {
   // Read once for the whole operation. The account refreshes a token a minute before expiry, so one
@@ -158,7 +158,7 @@ export async function withClient<T>(
       }
     }
     try {
-      return await fn(client);
+      return await fn(client, generation);
     } catch (err) {
       if (!(err instanceof McpSessionExpiredError)) throw err;
       if (options.retryOnExpiry !== false) {
@@ -169,7 +169,7 @@ export async function withClient<T>(
           if (initializeError instanceof McpAuthRequiredError) throw initializeError;
           throw notDispatched(initializeError);
         }
-        return await fn(client);
+        return await fn(client, generation);
       }
       // This call is not retried, since it may already have taken effect. The session is gone all
       // the same, so the cached id is dead: left in place it would fail every later call for a

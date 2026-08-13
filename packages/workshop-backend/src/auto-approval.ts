@@ -22,7 +22,18 @@ export interface AutoApprovalStorage {
 export type ApplyPendingActionFn = (
     record: ActionRecord & {type: "action"},
     resolvedBy: AiChatAuthorInfo,
-    autoApproved: boolean) => Promise<void>;
+    autoApproved: boolean) => Promise<"approved" | "invalidated">;
+
+/** Removes every auto-approval rule for a gatekeeper after its approval context becomes invalid. */
+export function clearAutoApprovalRules(
+    storage: Pick<AutoApprovalStorage, "autoApproveTags">, gatekeeperId: number): void {
+  const keys = [...storage.autoApproveTags.list()]
+    .filter(rule => rule.gatekeeperId === gatekeeperId)
+    .map(rule => `${gatekeeperId}:${rule.actionKind.tag}`);
+  for (const key of keys) {
+    storage.autoApproveTags.delete(key);
+  }
+}
 
 export class AutoApprovalDrainer {
   // Per-gatekeeper single-flight state. Key present => a drain is running for that gatekeeper; the
@@ -43,7 +54,7 @@ export class AutoApprovalDrainer {
     try {
       do {
         this.#draining.set(gatekeeperId, false);
-        await this.#drainOnce(gatekeeperId);
+        if (await this.#drainOnce(gatekeeperId) === "invalidated") return;
       } while (this.#draining.get(gatekeeperId));
     } finally {
       this.#draining.delete(gatekeeperId);
@@ -51,13 +62,13 @@ export class AutoApprovalDrainer {
   }
 
   // Apply all currently-eligible pending actions of the gatekeeper, in ascending id order. Stops at
-  // the first pending action that is NOT auto-eligible (a manual gate) or that throws while applying
-  // -- it is never skipped ahead of. This preserves in-order application and the invariant that
-  // nothing is silently applied past a human gate.
+  // the first pending action that is NOT auto-eligible (a manual gate), becomes invalidated, or
+  // throws while applying -- none is skipped ahead of. Invalidation also clears the gatekeeper's
+  // rules, so a later drain remains blocked until the user explicitly enables one again.
   //
   // Eligibility requires BOTH signals: the author's `autoApprovable` verdict on the action AND a
   // user-enabled rule for the action's type on this gatekeeper.
-  async #drainOnce(gatekeeperId: number): Promise<void> {
+  async #drainOnce(gatekeeperId: number): Promise<"complete" | "invalidated"> {
     // Materialize a snapshot first: list() is a lazy generator over storage, and we mutate the
     // actions collection (via applyPendingAction) as we go.
     let pending = [...this.storage.actions.list()].filter(
@@ -77,6 +88,8 @@ export class AutoApprovalDrainer {
       // Re-check immediately before applying, to guard against a concurrent drain having already
       // taken this one.
       let fresh = this.storage.actions.get(record.id);
+      if (fresh?.type === "action" && fresh.state === "rejected" &&
+          fresh.invalidationReason !== undefined) return "invalidated";
       if (!fresh || fresh.type !== "action" || fresh.state !== "pending") {
         continue;
       }
@@ -84,7 +97,8 @@ export class AutoApprovalDrainer {
       try {
         // Attribute the auto-approval to the user who enabled the rule -- it runs under their
         // authority.
-        await this.applyPendingAction(fresh, rule.enabledBy, true);
+        const outcome = await this.applyPendingAction(fresh, rule.enabledBy, true);
+        if (outcome === "invalidated") return "invalidated";
       } catch (err) {
         // Leave the action pending for manual handling and stop the drain (never skip ahead).
         logger.error("auto-approval failed", {
@@ -93,5 +107,6 @@ export class AutoApprovalDrainer {
         break;
       }
     }
+    return "complete";
   }
 }

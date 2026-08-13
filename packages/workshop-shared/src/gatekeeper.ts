@@ -18,6 +18,35 @@
 
 import type { WorkerEntrypoint, DurableObject, RpcTarget, RpcStub } from "cloudflare:workers";
 
+/** Stable RPC error code thrown when an approved action became invalid before dispatch. */
+export const ACTION_INVALIDATED_ERROR_CODE = "GATEKEEPER_ACTION_INVALIDATED";
+
+const ACTION_INVALIDATED_ERROR_PREFIX = `${ACTION_INVALIDATED_ERROR_CODE}: `;
+
+/** Creates an invalidation error whose discriminator survives Workers RPC error serialization. */
+export function createActionInvalidatedError(reason: string): Error & {
+  errorCode: typeof ACTION_INVALIDATED_ERROR_CODE;
+} {
+  return Object.assign(new Error(`${ACTION_INVALIDATED_ERROR_PREFIX}${reason}`), {
+    errorCode: ACTION_INVALIDATED_ERROR_CODE,
+  } as const);
+}
+
+/** Reads an invalidation reason from a local coded error or its message-only RPC representation. */
+export function getActionInvalidationReason(error: unknown): string | undefined {
+  const candidate = typeof error === "object" && error !== null && "errorCode" in error
+    ? error.errorCode
+    : undefined;
+  const message = typeof error === "object" && error !== null && "message" in error
+      && typeof error.message === "string"
+    ? error.message
+    : undefined;
+  if (message?.startsWith(ACTION_INVALIDATED_ERROR_PREFIX)) {
+    return message.slice(ACTION_INVALIDATED_ERROR_PREFIX.length);
+  }
+  return candidate === ACTION_INVALIDATED_ERROR_CODE ? message : undefined;
+}
+
 /**
  * A pagination cursor.
  *
@@ -806,6 +835,11 @@ export interface Gatekeeper<Session> extends DurableObject {
    *
    * If this throws an exception, the user will be informed that the action failed and given the
    * opportunity to retry or discard.
+   *
+   * If policy or authority changed after approval but before dispatch, throw an error created by
+   * `createActionInvalidatedError()`. New Workshop versions record that distinct terminal outcome;
+   * old versions leave the action pending rather than recording a write that was never dispatched
+   * as approved.
    *
    * Depending on policy conditions, an action may be approved and applied automatically. However,
    * the gatekeeper is nevertheless expected to submit all actions for approval; there is no mode
