@@ -45,15 +45,17 @@ export type ToolCatalog = {
   truncated: boolean;
 };
 
-/** One tool identity retained to validate an exact name against a large endpoint. */
+/** A tool identity plus the bounded annotation claims portal policy reads about it. */
 export type IndexedTool = {
   /** Exact wire name advertised by the endpoint. */
   name: string;
+  /** Boolean MCP policy annotations retained after validation. */
+  annotations?: McpToolAnnotations;
 };
 
-/** A bounded survey of endpoint tool identities without schemas or descriptions. */
+/** A bounded survey of endpoint identities and policy claims without schemas or descriptions. */
 export type ToolIndex = {
-  /** Retained tool identities. */
+  /** Retained index entries. */
   tools: IndexedTool[];
   /** Whether count, byte, page, or scan limits cut the survey short. */
   truncated: boolean;
@@ -353,9 +355,9 @@ export function clampToolDefinition(tool: McpWireTool | McpTool): McpTool {
   };
 }
 
-// Reduces one tool to an index entry. Bounded by its already-validated name.
+// Reduces one tool to a bounded name plus the four boolean claims portal classification consumes.
 function indexTool(tool: McpWireTool): IndexedTool {
-  return { name: tool.name };
+  return { name: tool.name, annotations: clampAnnotations(tool.annotations) };
 }
 
 /** Reduces one tool to the bounded, schema-free form returned by search. */
@@ -573,6 +575,14 @@ export class McpClient {
     return this.#list(maxTools, include, clampToolDefinition);
   }
 
+  /**
+   * Surveys names and policy annotations without retaining descriptions or schemas. Resolve a full
+   * definition with `findTool` before use.
+   */
+  async listToolIndex(maxTools: number): Promise<ToolIndex> {
+    return this.#list(maxTools, undefined, indexTool);
+  }
+
   /** Collects at most `maxTools` matching index entries without scanning later pages. */
   async listMatchingToolIndex(maxTools: number, include: McpToolFilter): Promise<ToolIndex> {
     return this.#list(maxTools, include, indexTool, true);
@@ -654,8 +664,7 @@ export class McpClient {
       }
       cursor = nextCursor;
     }
-    throw new McpProtocolError(
-      `MCP server kept paginating "tools/list" past ${MAX_TOOL_PAGES} pages.`);
+    return scanLimit();
   }
 
   /** Invokes one tool. A tool-level failure arrives as `isError`, not as a thrown error. */

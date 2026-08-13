@@ -39,9 +39,8 @@ export type ClassificationSource = "server-annotation" | "default";
 /** Upper bound on tools taken from one endpoint, to keep generated types and catalogs bounded. */
 export const MAX_TOOLS_PER_SERVER = 200;
 
-/** A tool plus the decisions this gatekeeper has made about it. */
-export type ClassifiedTool = {
-  tool: McpTool;
+/** The decisions this gatekeeper has made about one tool, independent of its full definition. */
+export type ToolClassification = {
   /** `read` runs immediately and is recorded as an observation; `action` goes to the queue. */
   mode: "read" | "action";
   /** Whether the deployment may let this action through without a prompt. */
@@ -53,10 +52,13 @@ export type ClassifiedTool = {
   classifiedBy: ClassificationSource;
 };
 
+/** A full tool definition plus the gatekeeper's classification decisions. */
+export type ClassifiedTool = ToolClassification & { tool: McpTool };
+
 // Whether the server declares this tool read-only. Strictly `=== true`, matching the spec's own
 // default of `false`, so an absent annotation is not a read.
-function isDeclaredReadOnly(tool: McpTool): boolean {
-  return tool.annotations?.readOnlyHint === true;
+function isDeclaredReadOnly(annotations: McpTool["annotations"]): boolean {
+  return annotations?.readOnlyHint === true;
 }
 
 /**
@@ -70,21 +72,27 @@ function isDeclaredReadOnly(tool: McpTool): boolean {
  * Every test is `=== true` or `=== false` rather than a truthiness check, so an unannotated tool
  * fails all of them and comes out as an action that can never auto-apply.
  */
-export function classifyTool(tool: McpTool, trust: ServerTrust): ClassifiedTool {
-  const annotations = tool.annotations ?? {};
-  const readOnly = isDeclaredReadOnly(tool);
+export function classifyAnnotations(
+  annotations: McpTool["annotations"], trust: ServerTrust,
+): ToolClassification {
+  const claims = annotations ?? {};
+  const readOnly = isDeclaredReadOnly(annotations);
 
   const autoApprovable = !readOnly
     && trust === "vetted"
-    && annotations.destructiveHint === false
-    && annotations.idempotentHint === true;
+    && claims.destructiveHint === false
+    && claims.idempotentHint === true;
 
   return {
-    tool,
     mode: readOnly ? "read" : "action",
     autoApprovable,
     classifiedBy: readOnly ? "server-annotation" : "default",
   };
+}
+
+/** Classifies a full definition using the same policy as annotation-only summaries. */
+export function classifyTool(tool: McpTool, trust: ServerTrust): ClassifiedTool {
+  return { tool, ...classifyAnnotations(tool.annotations, trust) };
 }
 
 /** The tool as a Gadget sees it, retaining the source of its read/action classification. */
@@ -128,7 +136,7 @@ function claimChar(value: boolean | undefined): string {
 // Every annotation that feeds a policy decision, in a fixed order.
 function policyClaims(tool: McpTool): string {
   return [
-    isDeclaredReadOnly(tool) ? "r" : "w",
+    isDeclaredReadOnly(tool.annotations) ? "r" : "w",
     claimChar(tool.annotations?.destructiveHint),
     claimChar(tool.annotations?.idempotentHint),
   ].join("");
