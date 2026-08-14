@@ -272,16 +272,19 @@ function makeHandle(args: HandleArgs): ModelHandle {
   //   Anthropic models (e.g. Haiku 4.5, which rejects the adaptive format) we pass nothing, so pi
   //   omits the `thinking` field and the provider default (no extended thinking) applies --
   //   matching the pre-pi quick-model behavior.
-  // - OpenAI Responses: explicit medium reasoning effort. pi would otherwise *disable* reasoning
-  //   when no effort is passed; effort selection also makes pi request encrypted reasoning
-  //   content, which -- with pi's unconditional `store: false` -- preserves the old stateless
-  //   ZDR behavior with reasoning carried between tool steps.
+  // - OpenAI Responses: explicit reasoning effort. Bily's primary Luna model runs at its supported
+  //   maximum; other OpenAI models retain the existing medium default. pi would otherwise
+  //   *disable* reasoning when no effort is passed; effort selection also makes pi request
+  //   encrypted reasoning content, which -- with pi's unconditional `store: false` -- preserves
+  //   the old stateless ZDR behavior with reasoning carried between tool steps.
   // - Everything else: provider defaults.
   const anthropicCompat = args.model.compat as AnthropicMessagesCompat | undefined;
   const apiExtras: Record<string, unknown> =
       args.model.api === "anthropic-messages"
           ? (anthropicCompat?.forceAdaptiveThinking === true ? { thinkingEnabled: true } : {}) :
-      args.model.api === "openai-responses" ? { reasoningEffort: "medium" } : {};
+      args.model.api === "openai-responses"
+          ? { reasoningEffort: args.model.id === "gpt-5.6-luna" ? "max" : "medium" }
+          : {};
 
   const handle: ModelHandle = {
     model: args.model,

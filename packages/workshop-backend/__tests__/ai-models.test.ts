@@ -431,3 +431,33 @@ describe("PDF attachment bridging", () => {
     }));
   }, 15000);
 });
+
+describe("OpenAI reasoning effort", () => {
+  beforeEach(() => {
+    capturedRequests.length = 0;
+  });
+
+  it("runs GPT 5.6 Luna at maximum reasoning effort", async () => {
+    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
+      provider: "openai",
+      model: "gpt-5.6-luna",
+      apiToken: "direct-api-token",
+    }, INITIATOR);
+
+    const request = await captureRequest(handle);
+    const body = JSON.parse(request.body) as { reasoning?: { effort?: string } };
+    expect(body.reasoning?.effort).toBe("max");
+  }, 15000);
+
+  it("keeps the medium default for other OpenAI Responses models", async () => {
+    const handle = getModel(env({ CF_AI_GATEWAY: undefined }), {
+      provider: "openai",
+      model: "gpt-5.2",
+      apiToken: "direct-api-token",
+    }, INITIATOR);
+
+    const request = await captureRequest(handle);
+    const body = JSON.parse(request.body) as { reasoning?: { effort?: string } };
+    expect(body.reasoning?.effort).toBe("medium");
+  }, 15000);
+});
