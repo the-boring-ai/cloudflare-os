@@ -11,13 +11,17 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as BlueprintsRouteImport } from './routes/blueprints'
+import { Route as CodexControlRouteImport } from './routes/codex-control'
 import { Route as ContextRouteImport } from './routes/context'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as GatekeepersRouteImport } from './routes/gatekeepers'
+import { Route as GtmRouteImport } from './routes/gtm'
 import { Route as OutputsRouteImport } from './routes/outputs'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ProvidersRouteImport } from './routes/providers'
+import { Route as RunsRouteImport } from './routes/runs'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as WorkspacesRouteImport } from './routes/workspaces'
 import { Route as BlueprintIdRouteImport } from './routes/blueprint.$id'
@@ -35,9 +39,19 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApprovalsRoute = ApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BlueprintsRoute = BlueprintsRouteImport.update({
   id: '/blueprints',
   path: '/blueprints',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CodexControlRoute = CodexControlRouteImport.update({
+  id: '/codex-control',
+  path: '/codex-control',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContextRoute = ContextRouteImport.update({
@@ -55,6 +69,11 @@ const GatekeepersRoute = GatekeepersRouteImport.update({
   path: '/gatekeepers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GtmRoute = GtmRouteImport.update({
+  id: '/gtm',
+  path: '/gtm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OutputsRoute = OutputsRouteImport.update({
   id: '/outputs',
   path: '/outputs',
@@ -68,6 +87,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const ProvidersRoute = ProvidersRouteImport.update({
   id: '/providers',
   path: '/providers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RunsRoute = RunsRouteImport.update({
+  id: '/runs',
+  path: '/runs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -104,13 +128,17 @@ const WorkspaceIdRoute = WorkspaceIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/approvals': typeof ApprovalsRoute
   '/blueprints': typeof BlueprintsRoute
+  '/codex-control': typeof CodexControlRoute
   '/context': typeof ContextRoute
   '/explore': typeof ExploreRoute
   '/gatekeepers': typeof GatekeepersRoute
+  '/gtm': typeof GtmRoute
   '/outputs': typeof OutputsRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
+  '/runs': typeof RunsRoute
   '/signup': typeof SignupRoute
   '/workspaces': typeof WorkspacesRoute
   '/blueprint/$id': typeof BlueprintIdRoute
@@ -121,13 +149,17 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/approvals': typeof ApprovalsRoute
   '/blueprints': typeof BlueprintsRoute
+  '/codex-control': typeof CodexControlRoute
   '/context': typeof ContextRoute
   '/explore': typeof ExploreRoute
   '/gatekeepers': typeof GatekeepersRoute
+  '/gtm': typeof GtmRoute
   '/outputs': typeof OutputsRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
+  '/runs': typeof RunsRoute
   '/signup': typeof SignupRoute
   '/workspaces': typeof WorkspacesRoute
   '/blueprint/$id': typeof BlueprintIdRoute
@@ -139,13 +171,17 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/approvals': typeof ApprovalsRoute
   '/blueprints': typeof BlueprintsRoute
+  '/codex-control': typeof CodexControlRoute
   '/context': typeof ContextRoute
   '/explore': typeof ExploreRoute
   '/gatekeepers': typeof GatekeepersRoute
+  '/gtm': typeof GtmRoute
   '/outputs': typeof OutputsRoute
   '/profile': typeof ProfileRoute
   '/providers': typeof ProvidersRoute
+  '/runs': typeof RunsRoute
   '/signup': typeof SignupRoute
   '/workspaces': typeof WorkspacesRoute
   '/blueprint/$id': typeof BlueprintIdRoute
@@ -158,13 +194,17 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/approvals'
     | '/blueprints'
+    | '/codex-control'
     | '/context'
     | '/explore'
     | '/gatekeepers'
+    | '/gtm'
     | '/outputs'
     | '/profile'
     | '/providers'
+    | '/runs'
     | '/signup'
     | '/workspaces'
     | '/blueprint/$id'
@@ -175,13 +215,17 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/approvals'
     | '/blueprints'
+    | '/codex-control'
     | '/context'
     | '/explore'
     | '/gatekeepers'
+    | '/gtm'
     | '/outputs'
     | '/profile'
     | '/providers'
+    | '/runs'
     | '/signup'
     | '/workspaces'
     | '/blueprint/$id'
@@ -192,13 +236,17 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/approvals'
     | '/blueprints'
+    | '/codex-control'
     | '/context'
     | '/explore'
     | '/gatekeepers'
+    | '/gtm'
     | '/outputs'
     | '/profile'
     | '/providers'
+    | '/runs'
     | '/signup'
     | '/workspaces'
     | '/blueprint/$id'
@@ -210,13 +258,17 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  ApprovalsRoute: typeof ApprovalsRoute
   BlueprintsRoute: typeof BlueprintsRoute
+  CodexControlRoute: typeof CodexControlRoute
   ContextRoute: typeof ContextRoute
   ExploreRoute: typeof ExploreRoute
   GatekeepersRoute: typeof GatekeepersRoute
+  GtmRoute: typeof GtmRoute
   OutputsRoute: typeof OutputsRoute
   ProfileRoute: typeof ProfileRoute
   ProvidersRoute: typeof ProvidersRoute
+  RunsRoute: typeof RunsRoute
   SignupRoute: typeof SignupRoute
   WorkspacesRoute: typeof WorkspacesRoute
   BlueprintIdRoute: typeof BlueprintIdRoute
@@ -241,11 +293,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/approvals': {
+      id: '/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof ApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/blueprints': {
       id: '/blueprints'
       path: '/blueprints'
       fullPath: '/blueprints'
       preLoaderRoute: typeof BlueprintsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/codex-control': {
+      id: '/codex-control'
+      path: '/codex-control'
+      fullPath: '/codex-control'
+      preLoaderRoute: typeof CodexControlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/context': {
@@ -269,6 +335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GatekeepersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gtm': {
+      id: '/gtm'
+      path: '/gtm'
+      fullPath: '/gtm'
+      preLoaderRoute: typeof GtmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/outputs': {
       id: '/outputs'
       path: '/outputs'
@@ -288,6 +361,13 @@ declare module '@tanstack/react-router' {
       path: '/providers'
       fullPath: '/providers'
       preLoaderRoute: typeof ProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/runs': {
+      id: '/runs'
+      path: '/runs'
+      fullPath: '/runs'
+      preLoaderRoute: typeof RunsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -338,13 +418,17 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  ApprovalsRoute: ApprovalsRoute,
   BlueprintsRoute: BlueprintsRoute,
+  CodexControlRoute: CodexControlRoute,
   ContextRoute: ContextRoute,
   ExploreRoute: ExploreRoute,
   GatekeepersRoute: GatekeepersRoute,
+  GtmRoute: GtmRoute,
   OutputsRoute: OutputsRoute,
   ProfileRoute: ProfileRoute,
   ProvidersRoute: ProvidersRoute,
+  RunsRoute: RunsRoute,
   SignupRoute: SignupRoute,
   WorkspacesRoute: WorkspacesRoute,
   BlueprintIdRoute: BlueprintIdRoute,

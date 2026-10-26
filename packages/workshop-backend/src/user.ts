@@ -1,3 +1,4 @@
+import { createOpenAi61Record } from "./openai-default.js";
 import { RpcStub } from "capnweb";
 import { GadgetMetadataWithTimestamps, AiChatAuthorInfo, AiModelConfig, SUGGESTED_MODELS, CollaboratorRole, ConnectedAccountsSubscriber, ConnectedAccountsFilter, GatekeeperVendorFilter, GadgetMetadata, BlueprintMetadata, BlueprintLibrarySummary, BlueprintSource, BlueprintUserSummary, BLUEPRINT_SCREENSHOT_R2_PREFIX, GatekeeperVendorInfo, BlueprintOutput, OutputSummary, WorkpieceId, ListOutputsResult } from '@gadgets/workshop-shared/api';
 import { Gatekeeper, GatekeeperUser, GatekeeperUserVerifier, GatekeeperVendor, AccountDescription, VendorDescription, GatekeeperConnectCallback, SupportedResource, ResourceConfiguratorFrame, AppUiContext, GatekeeperUiFrame } from "@gadgets/workshop-shared/gatekeeper";
@@ -579,6 +580,20 @@ export class UserDurableObject extends DurableObject<Cloudflare.Env> {
 
   async isOnboardingCompleted(): Promise<boolean> {
     return this.storage.onboardingCompleted.get();
+  }
+
+  async useOpenAi61(sourceModelId?: string): Promise<AiChatAuthorInfo> {
+    const id = "gpt-6.1-sol";
+    const gateway = getAiGatewayConfig(this.env)?.resolveModel(id);
+    if (this.storage.aiModels.get(id) || !gateway) {
+      // Only the profile returns over RPC. Provider credentials remain in user storage.
+      const record = createOpenAi61Record(
+        [...this.storage.aiModels.list()], this.storage.preferredModel.get(), sourceModelId);
+      this.storage.aiModels.put(record);
+    }
+    this.storage.preferredModel.put(id);
+    this.storage.quickModel.put(id);
+    return { type: "agent", id, name: "GPT 6.1 Sol" };
   }
 
   async completeOnboarding(): Promise<void> {

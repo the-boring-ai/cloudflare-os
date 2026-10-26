@@ -9,6 +9,8 @@ import {
   SidebarSimple,
   SquaresFour,
   Stack,
+  CheckCircle,
+  ListChecks,
 } from '@phosphor-icons/react'
 import { useSiteName } from '../../ServerConfigContext'
 import SiteLogo from '../SiteLogo'
@@ -140,6 +142,9 @@ export default function Sidebar({
               collapsed={collapsed}
             />
             {/* Gatekeeper management apps (e.g. the Context Library), listed dynamically. */}
+            <SidebarItem to="/approvals" label="Approvals" icon={<CheckCircle size={14} />} collapsed={collapsed} />
+            <SidebarItem to="/runs" label="Runs" icon={<ListChecks size={14} />} collapsed={collapsed} />
+            <SidebarItem to="/context" label="Context & Skills" icon={<BookOpen size={14} />} collapsed={collapsed} />
             {gatekeeperApps.map((app) => {
               // Escape the icon URL for safe interpolation into a CSS url("…") string.
               const maskUrl = app.icon
@@ -150,7 +155,7 @@ export default function Sidebar({
                 key={app.id}
                 to="/gatekeepers/$appId"
                 params={{ appId: app.id }}
-                label={app.title}
+                label={app.id === 'context' ? 'Context collections' : app.title}
                 icon={
                   maskUrl ? (
                     // Render the (monochrome) app icon as a CSS mask filled with the row's current

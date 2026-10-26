@@ -461,3 +461,19 @@ describe("OpenAI reasoning effort", () => {
     expect(body.reasoning?.effort).toBe("medium");
   }, 15000);
 });
+
+describe('Bily GPT 6.1 routing', () => {
+  it('uses Responses, medium reasoning and the documented token windows with the existing key', async () => {
+    capturedRequests.length = 0;
+    const handle = getModel({} as Cloudflare.Env, {
+      provider: 'openai', model: 'gpt-6.1-sol', apiToken: 'test-openai-connection',
+    }, INITIATOR);
+    expect(handle.model.api).toBe('openai-responses');
+    expect(handle.model.contextWindow).toBe(1050000);
+    expect(handle.model.maxTokens).toBe(128000);
+    const request = await captureRequest(handle);
+    expect(request.url).toBe('https://api.openai.com/v1/responses');
+    expect(request.headers.get('authorization')).toBe('Bearer test-openai-connection');
+    expect(JSON.parse(request.body)).toMatchObject({ model: 'gpt-6.1-sol', reasoning: { effort: 'medium' }, store: false });
+  });
+});
