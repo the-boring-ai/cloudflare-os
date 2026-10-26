@@ -1,3 +1,4 @@
+import { BILY_AGENT_CONTEXT } from "@gadgets/workshop-shared/bily-library";
 import { AiChatMessage, AiChatAuthorInfo, AiToolCall, AiChatMessageBody, AgentSpawnerConfig, AiChatStreamEvent, BlueprintOutput, WorkpieceId, type AiModelConfig, isTextLikeAttachmentMimeType, validateBindingName } from '@gadgets/workshop-shared/api';
 import { PDF_MIME_TYPE, modelApiSupportsPdfAttachments } from './chat-attachment-pdf';
 import { AgentCatalog, ObservationDescription } from '@gadgets/workshop-shared/gatekeeper';
@@ -2053,7 +2054,8 @@ export async function runAgent(
 
   // Deployment-wide admin instructions, appended to the static system slot (slot 0) so they stay
   // inside the Anthropic prompt cache window. "" when unset.
-  let instanceInstructions = formatInstanceInstructions(await hooks.getInstanceInstructions());
+  let instanceInstructions = formatInstanceInstructions(
+    [BILY_AGENT_CONTEXT, await hooks.getInstanceInstructions()].filter(Boolean).join("\n\n"));
 
   // The two system prompt slots: the non-project-specific parts, followed by the
   // project-specific parts. Kept as a two-part construction (static slot first) so the shared

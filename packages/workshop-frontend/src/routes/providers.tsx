@@ -18,6 +18,7 @@ import {
 import AddModelModal from '../AddModelModal'
 import { useDocumentTitle } from '../useDocumentTitle'
 import { MENU_CONTENT, MENU_ITEM, MENU_ITEM_DANGER } from '../components/menuStyles'
+import { persistSelectedModel } from '../modelSelection'
 
 export const Route = createFileRoute('/providers')({ component: ProvidersPage })
 
@@ -137,6 +138,10 @@ function ProvidersPage() {
   const toasts = useKumoToastManager()
   const [models, setModels] = useState<AiChatAuthorInfo[]>([])
   const [quickModel, setQuickModel] = useState<string | null>(null)
+  const [preferredModel, setPreferredModel] = useState<string | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+  const [sourceModel, setSourceModel] = useState('')
+  const [upgradeMessage, setUpgradeMessage] = useState('')
   const [aiConfig, setAiConfig] = useState<AiGatewayInfo | null>(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -147,14 +152,16 @@ function ProvidersPage() {
   const fetchAll = async () => {
     setLoadError(false)
     try {
-      const [modelList, qm, cfg] = await Promise.all([
+      const [modelList, qm, cfg, preferred] = await Promise.all([
         authenticatedApi.listModels(),
         authenticatedApi.getQuickModel(),
         authenticatedApi.getAiConfig(),
+        authenticatedApi.getPreferredModel(),
       ])
       setModels(modelList)
       setQuickModel(qm)
       setAiConfig(cfg)
+      setPreferredModel(preferred)
     } catch (err) {
       console.error('Failed to load providers:', err)
       setLoadError(true)
@@ -166,6 +173,21 @@ function ProvidersPage() {
   useEffect(() => { fetchAll() }, [authenticatedApi])
 
   const gatewayMode = aiConfig?.enabled === true
+
+  const useGpt61 = async () => {
+    setUpgrading(true)
+    setUpgradeMessage('')
+    try {
+      const model = await authenticatedApi.useOpenAi61(sourceModel || undefined)
+      persistSelectedModel(model.id)
+      await fetchAll()
+      setUpgradeMessage('GPT 6.1 Sol is selected for new workspaces and quick tasks. Existing chats keep their selected model. Model access is verified when a request runs.')
+    } catch (err) {
+      setUpgradeMessage(err instanceof Error ? err.message : 'Could not update the workspace model.')
+    } finally {
+      setUpgrading(false)
+    }
+  }
 
   const isBuiltIn = (modelId: string): boolean => {
     if (!aiConfig?.enabled) return false
@@ -219,6 +241,23 @@ function ProvidersPage() {
           Add provider
         </button>
       </header>
+
+      {!loading && !loadError && (
+        <section className="mx-3 my-3 rounded-xl border border-kumo-line bg-kumo-elevated p-4" aria-label="Workspace default">
+          <h2 className="text-sm font-semibold text-kumo-default">Workspace default</h2>
+          <p className="mt-1 text-sm text-kumo-subtle">{models.find((m) => m.id === preferredModel)?.name ?? 'No default selected'} · OpenAI GPT 6.1 Sol is the Bily workspace model.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {preferredModel !== 'gpt-6.1-sol' && models.length > 1 && !gatewayMode && (
+              <select aria-label="Existing OpenAI connection" value={sourceModel} onChange={(e) => setSourceModel(e.target.value)} className="rounded-lg border border-kumo-line bg-kumo-base px-3 py-2 text-sm text-kumo-default">
+                <option value="">Use current OpenAI connection</option>
+                {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            )}
+            <button type="button" className={PRIMARY_BTN} disabled={upgrading} onClick={() => { void useGpt61() }}>{upgrading ? 'Updating…' : preferredModel === 'gpt-6.1-sol' ? 'Select GPT 6.1 on this browser' : 'Use GPT 6.1 Sol'}</button>
+          </div>
+          <p className="mt-2 text-xs text-kumo-subtle" role="status">{upgradeMessage || 'Reuses your existing OpenAI connection. Provider credentials stay on the server.'}</p>
+        </section>
+      )}
 
       {/* Search — hidden when the user has no models */}
       {!loading && !loadError && models.length > 0 && (

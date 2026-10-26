@@ -140,6 +140,9 @@ class AuthenticatedApiImpl extends RpcTarget implements AuthenticatedApi {
   setPreferredModel(id: string | null): Promise<void> {
     return this.user.setPreferredModel(id);
   }
+  useOpenAi61(sourceModelId?: string): Promise<AiChatAuthorInfo> {
+    return this.user.useOpenAi61(sourceModelId);
+  }
   isOnboardingCompleted(): Promise<boolean> {
     return this.user.isOnboardingCompleted();
   }

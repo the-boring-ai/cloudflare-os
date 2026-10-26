@@ -7,6 +7,7 @@ export const NO_AGENT_OPTION_VALUE = "__gadgets_no_agent__";
 
 export function getStoredSelectedModel(
   models: AiChatAuthorInfo[],
+  preferredModel?: string | null,
 ): string | null {
   const storedModel = localStorage.getItem(LAST_SELECTED_MODEL_KEY);
 
@@ -19,7 +20,7 @@ export function getStoredSelectedModel(
   }
 
   // Default: Return the first configured model, or null if none are configured.
-  return models[0]?.id ?? null;
+  return models.find((model) => model.id === preferredModel)?.id ?? models[0]?.id ?? null;
 }
 
 export function persistSelectedModel(modelId: string | null): void {
