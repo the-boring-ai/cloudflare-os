@@ -10,7 +10,7 @@ const testState = vi.hoisted(() => {
   const newGadget = vi.fn<() => never>();
   return {
     addToast: vi.fn<(toast: unknown) => void>(),
-    authenticatedApi: { listModels, newGadget },
+    authenticatedApi: { listModels, newGadget, getPreferredModel: async () => null },
     listModels,
     navigate: vi.fn<(options: unknown) => void>(),
     newGadget,
