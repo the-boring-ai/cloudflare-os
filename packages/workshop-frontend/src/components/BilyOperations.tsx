@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowClockwise, ArrowUpRight, CheckCircle, ListChecks } from '@phosphor-icons/react'
+import { OutreachDeck } from './OutreachDeck'
 
 const button = 'inline-flex items-center justify-center gap-2 rounded-lg border border-kumo-line px-3 py-2 text-sm text-kumo-default hover:bg-kumo-tint disabled:cursor-default disabled:opacity-50'
 const primary = `${button} bg-kumo-brand text-white hover:bg-kumo-brand-hover`
@@ -44,15 +45,16 @@ function Notice({ text, error = false }: { text: string; error?: boolean }) {
 
 /** Native approvals destination, retaining both services' existing authorization checks. */
 export function BilyApprovals() {
-  const [tab, setTab] = useState<'sequences' | 'runs'>('sequences')
+  const [tab, setTab] = useState<'cards' | 'sequences' | 'runs'>('cards')
   return <div className="mx-auto w-full max-w-7xl px-6 py-8 sm:px-10">
     <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">Approvals</h1>
-    <p className="mt-2 text-sm text-kumo-subtle">Review customer sequences and bounded internal work in one place.</p>
-    <div className="mt-5 flex gap-2 border-b border-kumo-line pb-4" role="group" aria-label="Approval queues">
+    <p className="mt-2 text-sm text-kumo-subtle">One store at a time. Review the relationship, choose the next step.</p>
+    <div className="mt-5 flex flex-wrap gap-2 border-b border-kumo-line pb-4" role="group" aria-label="Approval queues">
+      <button className={tab === 'cards' ? primary : button} aria-pressed={tab === 'cards'} onClick={() => setTab('cards')}><CheckCircle size={16} /> Outreach cards</button>
       <button className={tab === 'sequences' ? primary : button} aria-pressed={tab === 'sequences'} onClick={() => setTab('sequences')}><CheckCircle size={16} /> Customer sequences</button>
       <button className={tab === 'runs' ? primary : button} aria-pressed={tab === 'runs'} onClick={() => setTab('runs')}><ListChecks size={16} /> Internal runs</button>
     </div>
-    {tab === 'sequences' ? <GtmQueue /> : <RunQueue approvalsOnly />}
+    {tab === 'cards' ? <OutreachDeck /> : tab === 'sequences' ? <GtmQueue /> : <RunQueue approvalsOnly />}
   </div>
 }
 
