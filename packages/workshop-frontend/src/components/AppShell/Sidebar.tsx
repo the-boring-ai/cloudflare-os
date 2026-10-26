@@ -11,6 +11,7 @@ import {
   Stack,
   CheckCircle,
   ListChecks,
+  EnvelopeSimple,
 } from '@phosphor-icons/react'
 import { useSiteName } from '../../ServerConfigContext'
 import SiteLogo from '../SiteLogo'
@@ -143,6 +144,7 @@ export default function Sidebar({
             />
             {/* Gatekeeper management apps (e.g. the Context Library), listed dynamically. */}
             <SidebarItem to="/approvals" label="Approvals" icon={<CheckCircle size={14} />} collapsed={collapsed} />
+            <SidebarItem to="/email" label="Email" icon={<EnvelopeSimple size={14} />} collapsed={collapsed} />
             <SidebarItem to="/runs" label="Runs" icon={<ListChecks size={14} />} collapsed={collapsed} />
             <SidebarItem to="/context" label="Context & Skills" icon={<BookOpen size={14} />} collapsed={collapsed} />
             {gatekeeperApps.map((app) => {
