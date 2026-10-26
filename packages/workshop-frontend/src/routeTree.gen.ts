@@ -15,6 +15,7 @@ import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as BlueprintsRouteImport } from './routes/blueprints'
 import { Route as CodexControlRouteImport } from './routes/codex-control'
 import { Route as ContextRouteImport } from './routes/context'
+import { Route as EmailRouteImport } from './routes/email'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as GatekeepersRouteImport } from './routes/gatekeepers'
 import { Route as GtmRouteImport } from './routes/gtm'
@@ -57,6 +58,11 @@ const CodexControlRoute = CodexControlRouteImport.update({
 const ContextRoute = ContextRouteImport.update({
   id: '/context',
   path: '/context',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailRoute = EmailRouteImport.update({
+  id: '/email',
+  path: '/email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExploreRoute = ExploreRouteImport.update({
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/blueprints': typeof BlueprintsRoute
   '/codex-control': typeof CodexControlRoute
   '/context': typeof ContextRoute
+  '/email': typeof EmailRoute
   '/explore': typeof ExploreRoute
   '/gatekeepers': typeof GatekeepersRoute
   '/gtm': typeof GtmRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/blueprints': typeof BlueprintsRoute
   '/codex-control': typeof CodexControlRoute
   '/context': typeof ContextRoute
+  '/email': typeof EmailRoute
   '/explore': typeof ExploreRoute
   '/gatekeepers': typeof GatekeepersRoute
   '/gtm': typeof GtmRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/blueprints': typeof BlueprintsRoute
   '/codex-control': typeof CodexControlRoute
   '/context': typeof ContextRoute
+  '/email': typeof EmailRoute
   '/explore': typeof ExploreRoute
   '/gatekeepers': typeof GatekeepersRoute
   '/gtm': typeof GtmRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/blueprints'
     | '/codex-control'
     | '/context'
+    | '/email'
     | '/explore'
     | '/gatekeepers'
     | '/gtm'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/blueprints'
     | '/codex-control'
     | '/context'
+    | '/email'
     | '/explore'
     | '/gatekeepers'
     | '/gtm'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/blueprints'
     | '/codex-control'
     | '/context'
+    | '/email'
     | '/explore'
     | '/gatekeepers'
     | '/gtm'
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   BlueprintsRoute: typeof BlueprintsRoute
   CodexControlRoute: typeof CodexControlRoute
   ContextRoute: typeof ContextRoute
+  EmailRoute: typeof EmailRoute
   ExploreRoute: typeof ExploreRoute
   GatekeepersRoute: typeof GatekeepersRoute
   GtmRoute: typeof GtmRoute
@@ -319,6 +332,13 @@ declare module '@tanstack/react-router' {
       path: '/context'
       fullPath: '/context'
       preLoaderRoute: typeof ContextRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email': {
+      id: '/email'
+      path: '/email'
+      fullPath: '/email'
+      preLoaderRoute: typeof EmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/explore': {
@@ -422,6 +442,7 @@ const rootRouteChildren: RootRouteChildren = {
   BlueprintsRoute: BlueprintsRoute,
   CodexControlRoute: CodexControlRoute,
   ContextRoute: ContextRoute,
+  EmailRoute: EmailRoute,
   ExploreRoute: ExploreRoute,
   GatekeepersRoute: GatekeepersRoute,
   GtmRoute: GtmRoute,

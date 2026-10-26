@@ -7,6 +7,7 @@ import {
   SquaresFour,
   CheckCircle,
   ListChecks,
+  EnvelopeSimple,
   BookOpen,
 } from '@phosphor-icons/react'
 import { useKumoToastManager } from '@cloudflare/kumo'
@@ -245,6 +246,7 @@ export default function CommandPalette({
       },
       ...formatCommands,
       { id: 'nav-approvals', label: 'Approvals', icon: <CheckCircle size={15} />, run: () => navigate({ to: '/approvals' }) },
+      { id: 'nav-email', label: 'Email', icon: <EnvelopeSimple size={15} />, run: () => navigate({ to: '/email', search: { run: '', store: '', hash: '' } }) },
       { id: 'nav-runs', label: 'Runs', icon: <ListChecks size={15} />, run: () => navigate({ to: '/runs' }) },
       { id: 'nav-context', label: 'Context & Skills', icon: <BookOpen size={15} />, run: () => navigate({ to: '/context' }) },
       {
