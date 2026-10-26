@@ -57,12 +57,11 @@ export function HomePageContent({ prompt }: HomeSearch) {
 
   useEffect(() => {
     let cancelled = false;
-    authenticatedApi
-      .listModels()
-      .then((list) => {
+    Promise.all([authenticatedApi.listModels(), authenticatedApi.getPreferredModel()])
+      .then(([list, preferred]) => {
         if (cancelled) return;
         setModels(list);
-        setSelectedModel(getStoredSelectedModel(list));
+        setSelectedModel(getStoredSelectedModel(list, preferred));
       })
       .catch((err) => {
         console.error("Failed to fetch models:", err);

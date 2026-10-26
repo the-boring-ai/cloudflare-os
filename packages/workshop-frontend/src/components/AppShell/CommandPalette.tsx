@@ -5,6 +5,9 @@ import {
   MagnifyingGlass,
   Plus,
   SquaresFour,
+  CheckCircle,
+  ListChecks,
+  BookOpen,
 } from '@phosphor-icons/react'
 import { useKumoToastManager } from '@cloudflare/kumo'
 import { useAuthenticatedApi } from '../../AuthContext'
@@ -241,6 +244,9 @@ export default function CommandPalette({
         run: () => navigate({ to: '/' }),
       },
       ...formatCommands,
+      { id: 'nav-approvals', label: 'Approvals', icon: <CheckCircle size={15} />, run: () => navigate({ to: '/approvals' }) },
+      { id: 'nav-runs', label: 'Runs', icon: <ListChecks size={15} />, run: () => navigate({ to: '/runs' }) },
+      { id: 'nav-context', label: 'Context & Skills', icon: <BookOpen size={15} />, run: () => navigate({ to: '/context' }) },
       {
         id: 'nav-workspaces',
         label: 'Workspaces',
