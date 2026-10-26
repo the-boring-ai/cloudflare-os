@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BilyApprovals, BilyRuns } from './BilyOperations'
 
 vi.mock('@tanstack/react-router', () => ({ Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a> }))
+vi.mock('./OutreachDeck', () => ({ OutreachDeck: () => <p>Outreach card review</p> }))
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const row = {
@@ -27,11 +28,11 @@ describe('native Bily operations', () => {
     await act(async () => root!.render(view))
   }
   const click = async (label: string) => {
-    const target = Array.from(container.querySelectorAll('button')).find((item) => item.textContent === label)
+    const target = Array.from(container.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)
     expect(target).toBeDefined()
     await act(async () => target!.click())
   }
-  const metric = (label: string) => Array.from(container.querySelectorAll('p')).find((item) => item.textContent === label)?.nextElementSibling?.textContent
+  const metric = (label: string) => Array.from(container.querySelectorAll('p')).find((item) => item.textContent?.trim() === label)?.nextElementSibling?.textContent
 
   it('reviews the exact displayed content and updates aggregate counts immediately', async () => {
     const fetchMock = vi.fn<(path: string, options?: RequestInit) => Promise<Response>>(async (path) => {
@@ -42,6 +43,7 @@ describe('native Bily operations', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
     await mount(<BilyApprovals />)
+    await click('Customer sequences')
     expect(metric('Ready for review')).toBe('1')
     await click('Mark reviewed')
     const reviewRequest = fetchMock.mock.calls.find(([path]) => path.endsWith('/review'))
@@ -55,6 +57,7 @@ describe('native Bily operations', () => {
   it('shows a readable queue to non-admins without offering review or import', async () => {
     vi.stubGlobal('fetch', vi.fn(async (path: string) => Response.json(path.endsWith('/runs') ? { runs: [run], identity: { email: 'reader@bily.ai', isAdmin: false } } : { rows: [row], nextOffset: null })))
     await mount(<BilyApprovals />)
+    await click('Customer sequences')
     expect(container.textContent).toContain('merchant@example.com')
     expect(Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Mark reviewed')).toBeUndefined()
     expect(Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'Import snapshot')?.disabled).toBe(true)
@@ -68,6 +71,7 @@ describe('native Bily operations', () => {
       return Response.json({ rows: [row], nextOffset: null })
     }))
     await mount(<BilyApprovals />)
+    await click('Customer sequences')
     const select = container.querySelector<HTMLSelectElement>('select[aria-label="Prepared run"]')!
     await act(async () => { select.value = nextRun.id; select.dispatchEvent(new Event('change', { bubbles: true })) })
     expect(container.textContent).toContain('Evidence unavailable')
