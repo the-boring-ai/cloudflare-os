@@ -7,6 +7,7 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   const backendHost = env.VITE_BACKEND_HOST?.trim() || 'localhost:8787'
+  const gtmHost = env.VITE_GTM_HOST?.trim() || backendHost
   const frontendErrorReporting = env.VITE_FRONTEND_ERROR_REPORTING === 'true'
   return {
     plugins: [
@@ -19,6 +20,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: true,
       proxy: {
+        '/api/gtm': `http://${gtmHost}`,
         '/api/client-errors': `http://${backendHost}`,
         '/blueprint-screenshot': `http://${backendHost}`,
         '/api/site-logo': `http://${backendHost}`,

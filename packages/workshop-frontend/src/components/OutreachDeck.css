@@ -1,0 +1,12 @@
+.outreach-stack { position: relative; isolation: isolate; }
+.outreach-stack-back { position: absolute; inset: 9px 12px -9px; z-index: -1; transform: rotate(1.1deg); }
+.outreach-card { transform-origin: 50% 75%; transition: transform 180ms ease, opacity 180ms ease; }
+.outreach-card:focus-visible { outline: 2px solid currentColor; outline-offset: 5px; }
+.outreach-deck :is(button, input, textarea):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.outreach-drag-handle { touch-action: pan-y; user-select: none; cursor: grab; }
+.outreach-drag-handle:active { cursor: grabbing; }
+.outreach-email { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  .outreach-card { transition: none; }
+  .outreach-stack-back { transform: none; }
+}
