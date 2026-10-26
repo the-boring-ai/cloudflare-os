@@ -86,4 +86,14 @@ describe('outreach card review', () => {
     await act(async () => container.querySelector('article')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
     expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
   })
+
+  it('links the exact public audit run and labels access limits without claiming a completed defect', async () => {
+    const card = { ...example(), audit: { ...example().audit, source: 'audit.bily.ai', resultStatus: 'access_limited', publicUrl: 'https://audit.bily.ai/audit/example.com?workflow=audit_exact_run', limitations: ['The storefront challenged the audit browser.'] } }
+    await mount([card])
+    await click('Audit evidence')
+    expect(container.textContent).toContain('Access limited · tracking unverified')
+    expect(container.querySelector('a[href="https://audit.bily.ai/audit/example.com?workflow=audit_exact_run"]')).not.toBeNull()
+    expect(container.textContent).toContain('The storefront challenged the audit browser.')
+    expect(container.textContent).not.toContain('Full audit')
+  })
 })
