@@ -20,7 +20,7 @@ const example = (id = 'card_one') => ({
 describe('outreach card review', () => {
   let root: Root | undefined
   let container: HTMLDivElement
-  afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); vi.unstubAllGlobals() })
+  afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
   const button = (name: string) => Array.from(container.querySelectorAll('button')).find(item => item.textContent?.trim() === name)!
   const click = async (name: string) => { expect(button(name)).toBeDefined(); await act(async () => button(name).click()) }
   const mount = async (cards = [example(), example('card_two')], admin = true) => {
@@ -95,5 +95,30 @@ describe('outreach card review', () => {
     expect(container.querySelector('a[href="https://audit.bily.ai/audit/example.com?workflow=audit_exact_run"]')).not.toBeNull()
     expect(container.textContent).toContain('The storefront challenged the audit browser.')
     expect(container.textContent).not.toContain('Full audit')
+  })
+
+  it('lets the operator inspect another held store without restoring, approving or editing either case', async () => {
+    const cards = [{ ...example(), reviewState: 'held' }, { ...example('card_two'), reviewState: 'held' }]
+    const calls = await mount(cards)
+    await click('Held 2')
+    const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Choose a store"]')!
+    expect(picker).not.toBeNull()
+    await act(async () => { picker.value = 'card_two'; picker.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Second Shop outreach card')
+    expect(cards.every(card => card.reviewState === 'held')).toBe(true)
+    expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+  })
+
+  it('keeps a preparation batch and its status counts separate from older review cards', async () => {
+    window.history.replaceState({}, '', '/approvals?batch=bily-gtm-20-20261028')
+    const cards = [example(), { ...example('card_two'), senderLane: 'cold', reviewState: 'held', context: 'Published business route.\nBatch bily-gtm-20-20261028; review material only.' }]
+    const calls = await mount(cards)
+    expect(container.textContent).toContain('1 store · 1 cold · 0 warm · 1 held')
+    expect(button('To review 0')).toBeDefined()
+    expect(button('Held 1')).toBeDefined()
+    expect(container.querySelector('a[href="/approvals"]')?.textContent).toBe('View all stores')
+    await click('Held 1')
+    expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Second Shop outreach card')
+    expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
   })
 })
