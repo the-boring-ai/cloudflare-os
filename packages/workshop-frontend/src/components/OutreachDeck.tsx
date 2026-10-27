@@ -33,6 +33,10 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 /** One store, one exact first email, and a durable decision before automatic dispatch. */
 export function OutreachDeck() {
   const [deck, setDeck] = useState<Deck | null>(null)
+  const [batch] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get('batch')
+    return value && /^bily-gtm-\d{1,3}-\d{8}$/.test(value) ? value : null
+  })
   const [view, setView] = useState<View>('review')
   const [selected, setSelected] = useState('')
   const [step, setStep] = useState(0)
@@ -49,7 +53,8 @@ export function OutreachDeck() {
   const [undo, setUndo] = useState<string | null>(null)
   const inFlight = useRef(false)
   const pointer = useRef<{ id: number; x: number; y: number } | null>(null)
-  const visible = deck?.cards.filter(card => belongs(card, view)) || []
+  const scopedCards = deck?.cards.filter(card => !batch || card.context.includes(`\nBatch ${batch};`)) || []
+  const visible = scopedCards.filter(card => belongs(card, view))
   const card = visible.find(item => item.id === selected) || visible[0]
   const current = card?.steps[step]
   const blocks = [...new Set([...(card?.gates || []), ...(card?.outbox?.status === 'blocked' ? card.outbox.blockReasons : [])])]
@@ -109,7 +114,7 @@ export function OutreachDeck() {
     if (Math.abs(dx) > 8) setDrag(Math.max(-240, Math.min(240, dx)))
   }
   const up = () => { pointer.current = null; if (drag > 110) void decide('approve'); else if (drag < -110) void decide('skip'); else setDrag(0) }
-  const counts = (name: View) => deck?.cards.filter(item => belongs(item, name)).length || 0
+  const counts = (name: View) => scopedCards.filter(item => belongs(item, name)).length
   const terminal = !!card?.outbox?.dispatch_fence_at
 
   return <section aria-label="Outreach card review" className="outreach-deck">
@@ -117,12 +122,13 @@ export function OutreachDeck() {
       <div className="flex items-center gap-2 text-xs text-kumo-subtle"><span className={`h-1.5 w-1.5 rounded-full ${deck?.sender.enabled ? 'bg-kumo-brand' : 'bg-kumo-line'}`} /><span>{deck?.sender.enabled ? senderAlive ? 'Automatic sender online' : 'Approvals wait for the sender' : 'Automatic sending paused'}</span>{deck && <span>· {deck.sender.dailyLimit} emails / day</span>}</div>
       <button className={secondary} onClick={() => setRevision(value => value + 1)} disabled={busy} aria-label="Refresh outreach queue"><ArrowClockwise size={15} /></button>
     </div>
-    {deck?.inventory && <p className="mt-3 text-xs leading-5 text-kumo-subtle">{deck.inventory.storeLinkedRecords?.toLocaleString()} store records · {deck.inventory.auditedDraftedStores} linked audits and drafts · {deck.inventory.billingHolds} billing review holds</p>}
-    <details className="mt-3 text-xs leading-6 text-kumo-subtle"><summary className="cursor-pointer">Outreach framework · 10-store review</summary><p className="mt-2 max-w-3xl">Start with the verified relationship, use one specific audit finding and its useful impact, then make one small ask. Follow-ups adapt to the reply. Service, refund and trust issues need resolution before a sales sequence.</p><p className="mt-1">Based on Winning by Design’s <a className="text-kumo-link" href="https://winningbydesign.com/spiced-framework/" target="_blank" rel="noopener noreferrer">SPICED framework</a>. Historical findings keep their audit date. Approval covers the first email shown.</p></details>
+    {batch ? <p className="mt-3 text-xs leading-5 text-kumo-subtle">{scopedCards.length} {scopedCards.length === 1 ? 'store' : 'stores'} · {scopedCards.filter(item => item.senderLane === 'cold').length} cold · {scopedCards.filter(item => item.senderLane !== 'cold').length} warm · {counts('held')} held <a className="ml-2 text-kumo-link" href="/approvals">View all stores</a></p> : deck?.inventory && <p className="mt-3 text-xs leading-5 text-kumo-subtle">{deck.inventory.storeLinkedRecords?.toLocaleString()} store records · {deck.inventory.auditedDraftedStores} linked audits and drafts · {deck.inventory.billingHolds} billing review holds</p>}
+    <details className="mt-3 text-xs leading-6 text-kumo-subtle"><summary className="cursor-pointer">Outreach framework{deck ? ` · ${scopedCards.length}-store review` : ''}</summary><p className="mt-2 max-w-3xl">Start with the verified relationship, use one specific audit finding and its useful impact, then make one small ask. Follow-ups adapt to the reply. Service, refund and trust issues need resolution before a sales sequence.</p><p className="mt-1">Based on Winning by Design’s <a className="text-kumo-link" href="https://winningbydesign.com/spiced-framework/" target="_blank" rel="noopener noreferrer">SPICED framework</a>. Historical findings keep their audit date. Approval covers the first email shown.</p></details>
     <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Outreach views">{(['review','approved','sent','held','skipped'] as View[]).map(name => <button key={name} className={view === name ? primary : secondary} aria-pressed={view === name} onClick={() => { setView(name); setSelected(''); setStep(0); setEditing(false) }}>{({ review: 'To review', approved: 'Approved', sent: 'Sent', held: 'Held', skipped: 'Skipped' })[name]} <span className="text-xs opacity-70">{counts(name)}</span></button>)}</div>
     {error && <p role="alert" className="mt-4 rounded-xl border border-kumo-line p-3 text-sm text-kumo-danger">{error}</p>}
     <div className="mx-auto mt-7 max-w-3xl">
       <div className="mb-3 flex items-center justify-between gap-3 text-xs text-kumo-subtle"><span>{loading && !deck ? 'Loading your stores…' : visible.length ? `${visible.length} ${visible.length === 1 ? 'store' : 'stores'} in this view` : 'All caught up'}</span><button className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-kumo-tint disabled:opacity-40" disabled={!undo || busy} onClick={() => { void restore() }}><ArrowCounterClockwise size={14} /> Undo review</button></div>
+      {visible.length > 1 && <label className="mb-4 block text-xs text-kumo-subtle">Store in this view<select className={`${field} mt-2 text-sm`} aria-label="Choose a store" value={card?.id || ''} disabled={busy || editing} onChange={event => setSelected(event.target.value)}>{visible.map(item => <option key={item.id} value={item.id}>{item.name} · {item.domain}</option>)}</select></label>}
       {!card ? <div className="rounded-2xl border border-kumo-line bg-kumo-base px-6 py-16 text-center"><CheckCircle size={36} className="mx-auto text-kumo-subtle" /><h2 className="mt-4 text-xl font-medium text-kumo-default">{loading && !deck ? 'Loading outreach' : view === 'review' ? 'You are through the stack' : 'Nothing here yet'}</h2><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-kumo-subtle">{view === 'review' ? 'Approved emails stay in the queue until the final checks pass. Sent receipts appear in Sent.' : 'Your decisions and verified send receipts will appear here.'}</p>{view === 'review' && counts('approved') > 0 && <button className={`${secondary} mt-6`} onClick={() => setView('approved')}>View approved emails <ArrowRight size={15} /></button>}</div> : <>
         <div className="outreach-stack">
           {visible.length > 1 && <div aria-hidden="true" className="outreach-stack-back rounded-2xl border border-kumo-line bg-kumo-elevated" />}
