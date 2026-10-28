@@ -121,4 +121,16 @@ describe('outreach card review', () => {
     expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Second Shop outreach card')
     expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
   })
+
+  it('distinguishes a Google delivery opportunity from an event anomaly requiring verification', async () => {
+    const cards = [{ ...example(), audit: { ...example().audit, source: 'audit.bily.ai', resultStatus: 'implementation_opportunity' } }, { ...example('card_two'), audit: { ...example().audit, source: 'audit.bily.ai', resultStatus: 'observed_event_anomaly' } }]
+    const calls = await mount(cards)
+    await click('Audit evidence')
+    expect(container.textContent).toContain('Implementation opportunity · observed delivery route')
+    const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Choose a store"]')!
+    await act(async () => { picker.value = 'card_two'; picker.dispatchEvent(new Event('change', { bubbles: true })) })
+    expect(container.textContent).toContain('Repeated event observed · controlled verification required')
+    expect(container.textContent).not.toContain('Verified measurement finding')
+    expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+  })
 })
