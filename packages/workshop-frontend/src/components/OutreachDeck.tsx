@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { ArrowClockwise, ArrowCounterClockwise, ArrowLeft, ArrowRight, ArrowUpRight, Check, CheckCircle, Clock, PaperPlaneTilt, Pause, PencilSimple, X } from '@phosphor-icons/react'
+import { RelationshipBrief, type ReviewBrief } from './RelationshipBrief'
 import './OutreachDeck.css'
 
 const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-kumo-line px-4 py-2 text-sm text-kumo-default hover:bg-kumo-tint disabled:cursor-default disabled:opacity-45'
@@ -14,6 +15,7 @@ type Card = {
   steps: Email[]; attio: { personId: string; shopifyDomain: string; contactConfidence: string }
   audit: { taskId: string | null; completedAt: string; takeaway: string; auditedUrl: string; source?: string; publicUrl?: string | null; resultStatus?: string; limitations?: string[] }
   history: { gmailThreadIds: string[]; coverage: string }
+  reviewBrief?: ReviewBrief
   outbox: null | { id: string; status: string; blockReasons: string[]; approved_at: string; approval_expires_at: string; sent_message_id: string | null; sent_thread_id: string | null; sent_at: string | null; dispatch_fence_at: string | null }
 }
 type Deck = { cards: Card[]; identity: { email: string; isAdmin: boolean }; sender: { enabled: boolean; dailyLimit: number; lastHeartbeatAt: string | null }; inventory: null | { storeLinkedRecords?: number; auditedDraftedStores?: number; billingHolds?: number; draftReviewCandidates?: number } }
@@ -37,8 +39,13 @@ export function OutreachDeck() {
     const value = new URLSearchParams(window.location.search).get('batch')
     return value && /^bily-gtm-\d{1,3}-\d{8}$/.test(value) ? value : null
   })
+  const [requestedCard] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get('card')
+    return value && /^card_[a-f0-9]{24}$/.test(value) ? value : null
+  })
+  const requestedCardResolved = useRef(false)
   const [view, setView] = useState<View>('review')
-  const [selected, setSelected] = useState('')
+  const [selected, setSelected] = useState(requestedCard || '')
   const [step, setStep] = useState(0)
   const [detail, setDetail] = useState<'relationship' | 'audit' | 'checks'>('relationship')
   const [loading, setLoading] = useState(true)
@@ -55,7 +62,7 @@ export function OutreachDeck() {
   const pointer = useRef<{ id: number; x: number; y: number } | null>(null)
   const scopedCards = deck?.cards.filter(card => !batch || card.context.includes(`\nBatch ${batch};`)) || []
   const visible = scopedCards.filter(card => belongs(card, view))
-  const card = visible.find(item => item.id === selected) || visible[0]
+  const card = visible.find(item => item.id === selected) || (requestedCard && selected === requestedCard ? undefined : visible[0])
   const current = card?.steps[step]
   const blocks = [...new Set([...(card?.gates || []), ...(card?.outbox?.status === 'blocked' ? card.outbox.blockReasons : [])])]
   const senderAlive = !!deck?.sender.lastHeartbeatAt && Date.now() - Date.parse(deck.sender.lastHeartbeatAt) < 8 * 60000
@@ -65,7 +72,15 @@ export function OutreachDeck() {
     const load = async () => {
       try {
         const data = await api<Deck>('', { signal: controller.signal })
-        if (!controller.signal.aborted) { setDeck(data); setError('') }
+        if (!controller.signal.aborted) {
+          setDeck(data); setError(requestedCard && !data.cards.some(item => item.id === requestedCard && (!batch || item.context.includes(`\nBatch ${batch};`))) ? 'This store card is not available in the current review queue. Choose another store to continue.' : '')
+          if (requestedCard && !requestedCardResolved.current) {
+            requestedCardResolved.current = true
+            const target = data.cards.find(item => item.id === requestedCard && (!batch || item.context.includes(`\nBatch ${batch};`)))
+            if (target) { setSelected(target.id); setView(target.outbox?.status === 'sent' ? 'sent' : target.reviewState === 'approved' ? 'approved' : target.reviewState === 'held' ? 'held' : target.reviewState === 'skipped' ? 'skipped' : 'review') }
+            else setError('This store card is not available in the current review queue.')
+          }
+        }
       } catch (err) { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'The queue could not load.') }
       finally { if (!controller.signal.aborted) setLoading(false) }
     }
@@ -122,7 +137,7 @@ export function OutreachDeck() {
       <div className="flex items-center gap-2 text-xs text-kumo-subtle"><span className={`h-1.5 w-1.5 rounded-full ${deck?.sender.enabled ? 'bg-kumo-brand' : 'bg-kumo-line'}`} /><span>{deck?.sender.enabled ? senderAlive ? 'Automatic sender online' : 'Approvals wait for the sender' : 'Automatic sending paused'}</span>{deck && <span>· {deck.sender.dailyLimit} emails / day</span>}</div>
       <button className={secondary} onClick={() => setRevision(value => value + 1)} disabled={busy} aria-label="Refresh outreach queue"><ArrowClockwise size={15} /></button>
     </div>
-    {batch ? <p className="mt-3 text-xs leading-5 text-kumo-subtle">{scopedCards.length} {scopedCards.length === 1 ? 'store' : 'stores'} · {scopedCards.filter(item => item.senderLane === 'cold').length} cold · {scopedCards.filter(item => item.senderLane !== 'cold').length} warm · {counts('held')} held <a className="ml-2 text-kumo-link" href="/approvals">View all stores</a></p> : deck?.inventory && <p className="mt-3 text-xs leading-5 text-kumo-subtle">{deck.inventory.storeLinkedRecords?.toLocaleString()} store records · {deck.inventory.auditedDraftedStores} linked audits and drafts · {deck.inventory.billingHolds} billing review holds</p>}
+    {batch ? <p className="mt-3 text-xs leading-5 text-kumo-subtle">{scopedCards.length} {scopedCards.length === 1 ? 'store' : 'stores'} · {scopedCards.filter(item => item.senderLane === 'cold').length} cold · {scopedCards.filter(item => item.senderLane !== 'cold').length} warm · {counts('held')} held <a className="ml-2 text-kumo-link" href="/approvals?view=sequences">View all stores</a></p> : deck && <p className="mt-3 text-xs leading-5 text-kumo-subtle">{scopedCards.length} prepared outreach {scopedCards.length === 1 ? 'card' : 'cards'} <a className="ml-2 text-kumo-link" href="/approvals?view=sequences">Browse all stores</a></p>}
     <details className="mt-3 text-xs leading-6 text-kumo-subtle"><summary className="cursor-pointer">Outreach framework{deck ? ` · ${scopedCards.length}-store review` : ''}</summary><p className="mt-2 max-w-3xl">Start with the relationship and one evidenced measurement issue, explain its effect on campaign decisions, then propose a bounded verification or repair. Prioritize conversion delivery, repeated events, Google Tag Gateway and GTM implementation. Keep confirmed failures, observed anomalies and implementation opportunities distinct. Follow-ups adapt to the reply. Service, refund and trust issues need resolution before a sales sequence.</p><p className="mt-1">Based on Winning by Design’s <a className="text-kumo-link" href="https://winningbydesign.com/spiced-framework/" target="_blank" rel="noopener noreferrer">SPICED framework</a>. Customer impact, deadlines and buying decisions need evidence. Approval covers the first email shown.</p></details>
     <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Outreach views">{(['review','approved','sent','held','skipped'] as View[]).map(name => <button key={name} className={view === name ? primary : secondary} aria-pressed={view === name} onClick={() => { setView(name); setSelected(''); setStep(0); setEditing(false) }}>{({ review: 'To review', approved: 'Approved', sent: 'Sent', held: 'Held', skipped: 'Skipped' })[name]} <span className="text-xs opacity-70">{counts(name)}</span></button>)}</div>
     {error && <p role="alert" className="mt-4 rounded-xl border border-kumo-line p-3 text-sm text-kumo-danger">{error}</p>}
@@ -132,7 +147,7 @@ export function OutreachDeck() {
       {!card ? <div className="rounded-2xl border border-kumo-line bg-kumo-base px-6 py-16 text-center"><CheckCircle size={36} className="mx-auto text-kumo-subtle" /><h2 className="mt-4 text-xl font-medium text-kumo-default">{loading && !deck ? 'Loading outreach' : view === 'review' ? 'You are through the stack' : 'Nothing here yet'}</h2><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-kumo-subtle">{view === 'review' ? 'Approved emails stay in the queue until the final checks pass. Sent receipts appear in Sent.' : 'Your decisions and verified send receipts will appear here.'}</p>{view === 'review' && counts('approved') > 0 && <button className={`${secondary} mt-6`} onClick={() => setView('approved')}>View approved emails <ArrowRight size={15} /></button>}</div> : <>
         <div className="outreach-stack">
           {visible.length > 1 && <div aria-hidden="true" className="outreach-stack-back rounded-2xl border border-kumo-line bg-kumo-elevated" />}
-          <article key={card.id} className="outreach-card relative rounded-2xl border border-kumo-line bg-kumo-base" style={{ transform: `translateX(${drag}px) rotate(${drag / 35}deg)` }} aria-label={`${card.name} outreach card`} tabIndex={0} onKeyDown={event => { if ((event.target as HTMLElement).closest('input,textarea,button,a,select') || view !== 'review' || editing || event.ctrlKey || event.metaKey || event.altKey) return; if (event.key === 'ArrowLeft') { event.preventDefault(); void decide('skip') } if (event.key === 'ArrowRight') { event.preventDefault(); void decide('approve') } if (event.key.toLowerCase() === 'h') { event.preventDefault(); void decide('hold') } }}>
+          <article key={card.id} className="outreach-card relative rounded-2xl border border-kumo-line bg-kumo-base" style={{ transform: `translateX(${drag}px) rotate(${drag / 35}deg)` }} aria-label={`${card.name} outreach card`} tabIndex={0} onKeyDown={event => { if ((event.target as HTMLElement).closest('input,textarea,button,a,select,summary') || view !== 'review' || editing || event.ctrlKey || event.metaKey || event.altKey) return; if (event.key === 'ArrowLeft') { event.preventDefault(); void decide('skip') } if (event.key === 'ArrowRight') { event.preventDefault(); void decide('approve') } if (event.key.toLowerCase() === 'h') { event.preventDefault(); void decide('hold') } }}>
             {Math.abs(drag) > 35 && <span aria-hidden="true" className={`pointer-events-none absolute right-5 top-5 z-10 rounded-lg border-2 border-current bg-kumo-base px-3 py-1 text-sm font-semibold ${drag > 0 ? 'text-kumo-link' : 'text-kumo-subtle'}`}>{drag > 0 ? 'APPROVE' : 'SKIP'}</span>}
             <div className="outreach-drag-handle border-b border-kumo-line px-5 pb-5 pt-6 sm:px-7" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { pointer.current = null; setDrag(0) }}>
               <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-kumo-line bg-kumo-tint text-sm font-semibold text-kumo-default">{card.name.split(/\s+/).slice(0,2).map(word => word[0]).join('').toUpperCase()}</span><div className="min-w-0"><h2 className="truncate text-lg font-semibold tracking-tight text-kumo-default">{card.name}</h2><span className="mt-1 block truncate text-xs text-kumo-subtle">{card.domain}</span></div></div><span className="shrink-0 rounded-full border border-kumo-line px-2.5 py-1 text-xs text-kumo-subtle">{label(card)}</span></div>
@@ -147,7 +162,7 @@ export function OutreachDeck() {
             </div>
             <div className="border-t border-kumo-line bg-kumo-elevated/40 px-5 pb-5 pt-3 sm:px-7">
               <div role="group" aria-label="Store evidence" className="flex flex-wrap gap-1">{(['relationship','audit','checks'] as const).map(name => <button key={name} className={`rounded-lg px-3 py-2 text-xs ${detail === name ? 'bg-kumo-tint text-kumo-default' : 'text-kumo-subtle hover:bg-kumo-tint'}`} aria-pressed={detail === name} onClick={() => setDetail(name)}>{name === 'relationship' ? 'Relationship' : name === 'audit' ? 'Audit evidence' : `Send checks${blocks.length ? ` · ${blocks.length}` : ''}`}</button>)}</div>
-              <div className="mt-3 text-sm leading-6 text-kumo-subtle">{detail === 'relationship' ? <><p>{card.context}</p><p className="mt-3"><span className="font-medium text-kumo-default">Next useful step:</span> {card.nextAction}</p><a className="mt-3 inline-flex items-center gap-1 text-xs text-kumo-link" href={`https://app.attio.com/bily/person/${card.attio.personId}`} target="_blank" rel="noopener noreferrer">Open Attio <ArrowUpRight size={12} /></a></> : detail === 'audit' ? <><p className="mb-2 text-xs font-medium text-kumo-default">{auditLabel(card)}</p><p>{card.audit.takeaway}</p><p className="mt-3 text-xs">Checked {date(card.audit.completedAt)} · {card.audit.source === 'audit.bily.ai' ? 'audit.bily.ai' : 'Historical source'}</p>{card.audit.publicUrl && <a className="mt-2 inline-flex items-center gap-1 text-xs text-kumo-link" href={card.audit.publicUrl} target="_blank" rel="noopener noreferrer">Open this audit run <ArrowUpRight size={12} /></a>}{!!card.audit.limitations?.length && <details className="mt-3 text-xs"><summary className="cursor-pointer">Coverage limits</summary><ul className="mt-2 list-disc space-y-1 pl-4">{card.audit.limitations.map(item => <li key={item}>{item}</li>)}</ul></details>}<p className="mt-2 break-all text-xs">{card.attio.shopifyDomain}</p></> : <><p className="mb-2 text-xs">Checked {card.checkedAt ? new Date(card.checkedAt).toLocaleString() : 'Not verified'}. Approvals expire after 24 hours.</p>{blocks.length ? <ul className="list-disc space-y-1 pl-4 text-xs leading-5">{blocks.map(reason => <li key={reason}>{reason}</li>)}</ul> : <p className="inline-flex items-center gap-2 text-xs"><CheckCircle size={15} /> Current checks are clear.</p>}<button className={`${secondary} mt-3`} onClick={() => { void refresh() }} disabled={busy || terminal}><ArrowClockwise size={14} /> Refresh checks</button></>}</div>
+              <div className="mt-3 text-sm leading-6 text-kumo-subtle">{detail === 'relationship' ? <><RelationshipBrief brief={card.reviewBrief} context={card.context} /><p className="mt-3"><span className="font-medium text-kumo-default">Next useful step:</span> {card.nextAction}</p><a className="mt-3 inline-flex items-center gap-1 text-xs text-kumo-link" href={`https://app.attio.com/bily/person/${card.attio.personId}`} target="_blank" rel="noopener noreferrer">Open Attio <ArrowUpRight size={12} /></a></> : detail === 'audit' ? <><p className="mb-2 text-xs font-medium text-kumo-default">{auditLabel(card)}</p><p>{card.audit.takeaway}</p><p className="mt-3 text-xs">Checked {date(card.audit.completedAt)} · {card.audit.source === 'audit.bily.ai' ? 'audit.bily.ai' : 'Historical source'}</p>{card.audit.publicUrl && <a className="mt-2 inline-flex items-center gap-1 text-xs text-kumo-link" href={card.audit.publicUrl} target="_blank" rel="noopener noreferrer">Open this audit run <ArrowUpRight size={12} /></a>}{!!card.audit.limitations?.length && <details className="mt-3 text-xs"><summary className="cursor-pointer">Coverage limits</summary><ul className="mt-2 list-disc space-y-1 pl-4">{card.audit.limitations.map(item => <li key={item}>{item}</li>)}</ul></details>}<p className="mt-2 break-all text-xs">{card.attio.shopifyDomain}</p></> : <><p className="mb-2 text-xs">Checked {card.checkedAt ? new Date(card.checkedAt).toLocaleString() : 'Not verified'}. Approvals expire after 24 hours.</p>{blocks.length ? <ul className="list-disc space-y-1 pl-4 text-xs leading-5">{blocks.map(reason => <li key={reason}>{reason}</li>)}</ul> : <p className="inline-flex items-center gap-2 text-xs"><CheckCircle size={15} /> Current checks are clear.</p>}<button className={`${secondary} mt-3`} onClick={() => { void refresh() }} disabled={busy || terminal}><ArrowClockwise size={14} /> Refresh checks</button></>}</div>
             </div>
           </article>
         </div>
