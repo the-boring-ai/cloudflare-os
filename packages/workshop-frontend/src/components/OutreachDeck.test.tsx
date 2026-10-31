@@ -116,7 +116,7 @@ describe('outreach card review', () => {
     expect(container.textContent).toContain('1 store · 1 cold · 0 warm · 1 held')
     expect(button('To review 0')).toBeDefined()
     expect(button('Held 1')).toBeDefined()
-    expect(container.querySelector('a[href="/approvals"]')?.textContent).toBe('View all stores')
+    expect(container.querySelector('a[href="/approvals?view=sequences"]')?.textContent).toBe('View all stores')
     await click('Held 1')
     expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Second Shop outreach card')
     expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
@@ -132,5 +132,50 @@ describe('outreach card review', () => {
     expect(container.textContent).toContain('Repeated event observed · controlled verification required')
     expect(container.textContent).not.toContain('Verified measurement finding')
     expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+  })
+
+  it('opens an exact held card from the store directory without restoring or approving it', async () => {
+    const id = 'card_0123456789abcdef01234567'
+    window.history.replaceState({}, '', '/approvals?card=' + id)
+    const cards = [example(), { ...example(id), reviewState: 'held' }]
+    const calls = await mount(cards)
+    expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Second Shop outreach card')
+    expect(button('Held 1').getAttribute('aria-pressed')).toBe('true')
+    expect(cards[1].reviewState).toBe('held')
+    expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+  })
+
+  it('does not substitute another store when a linked review card is missing', async () => {
+    window.history.replaceState({}, '', '/approvals?card=card_0123456789abcdef01234567')
+    const calls = await mount([example()])
+    expect(container.textContent).toContain('This store card is not available')
+    expect(container.querySelector('article')).toBeNull()
+    expect(button('Approve & queue')).toBeUndefined()
+    await click('To review 1')
+    expect(container.querySelector('article')?.getAttribute('aria-label')).toBe('Example Shop outreach card')
+    expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+  })
+
+  it('shows every pitch alternative and protects disclosure navigation from review shortcuts', async () => {
+    const brief = {
+      version: 1 as const, preparedAt: '2026-10-31T00:00:00Z', sourceCoverage: 'Public capture plus dated relationship history.', selectedAngleId: 'meta',
+      angles: [
+        { id: 'meta', title: 'Meta event reliability', status: 'observed' as const, pitch: 'Check one action against what Meta counts.', reason: 'Two requests were observed.', impact: 'Possible misleading campaign input.', evidence: ['Two browser requests in a captured funnel.'], verify: ['Confirm the event and platform receipt.'], avoid: ['Do not claim duplicate purchases.'] },
+        { id: 'google', title: 'Google measurement route', status: 'hypothesis' as const, pitch: 'Check Gateway eligibility with the tag owner.', reason: 'A potential implementation path.', impact: 'Potential resilience benefit.', evidence: [], verify: ['Confirm the current Google destination.'], avoid: ['No unsupported conversion-loss claim.'] },
+      ],
+      questions: ['Which owner should receive the message?'], decisionGaps: ['No critical event is confirmed.'], sequenceReasoning: ['Lead with the specific observation.', 'Ask for the decisive check.', 'Leave the evidence available.'],
+    }
+    const cards = [{ ...example(), reviewBrief: brief }]
+    const calls = await mount(cards)
+    const alternatives = container.querySelector('section[aria-label="Relationship and pitch options"]')!
+    const disclosures = alternatives.querySelectorAll('details')
+    expect(disclosures[0].open).toBe(true)
+    expect(disclosures[1].open).toBe(false)
+    expect(alternatives.textContent).toContain('Google measurement route')
+    expect(alternatives.textContent).toContain('Do not claim duplicate purchases.')
+    expect(alternatives.textContent).toContain('Which owner should receive the message?')
+    await act(async () => disclosures[1].querySelector('summary')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    expect(calls.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+    expect(container.textContent).toContain('Would a refreshed comparison help?')
   })
 })
