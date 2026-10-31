@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowClockwise, ArrowUpRight, CheckCircle, ListChecks } from '@phosphor-icons/react'
 import { OutreachDeck } from './OutreachDeck'
+import { StoreCatalog } from './StoreCatalog'
 
 const button = 'inline-flex items-center justify-center gap-2 rounded-lg border border-kumo-line px-3 py-2 text-sm text-kumo-default hover:bg-kumo-tint disabled:cursor-default disabled:opacity-50'
 const primary = `${button} bg-kumo-brand text-white hover:bg-kumo-brand-hover`
@@ -45,7 +46,7 @@ function Notice({ text, error = false }: { text: string; error?: boolean }) {
 
 /** Native approvals destination, retaining both services' existing authorization checks. */
 export function BilyApprovals() {
-  const [tab, setTab] = useState<'cards' | 'sequences' | 'runs'>('cards')
+  const [tab, setTab] = useState<'cards' | 'sequences' | 'runs'>(() => new URLSearchParams(window.location.search).get('view') === 'sequences' ? 'sequences' : 'cards')
   return <div className="mx-auto w-full max-w-7xl px-6 py-8 sm:px-10">
     <h1 className="text-2xl font-semibold tracking-tight text-kumo-default">Approvals</h1>
     <p className="mt-2 text-sm text-kumo-subtle">One store at a time. Review the relationship, choose the next step.</p>
@@ -54,8 +55,19 @@ export function BilyApprovals() {
       <button className={tab === 'sequences' ? primary : button} aria-pressed={tab === 'sequences'} onClick={() => setTab('sequences')}><CheckCircle size={16} /> Customer sequences</button>
       <button className={tab === 'runs' ? primary : button} aria-pressed={tab === 'runs'} onClick={() => setTab('runs')}><ListChecks size={16} /> Internal runs</button>
     </div>
-    {tab === 'cards' ? <OutreachDeck /> : tab === 'sequences' ? <GtmQueue /> : <RunQueue approvalsOnly />}
+    {tab === 'cards' ? <OutreachDeck /> : tab === 'sequences' ? <CustomerSequences /> : <RunQueue approvalsOnly />}
   </div>
+}
+
+function CustomerSequences() {
+  const [view, setView] = useState<'stores' | 'prepared'>('stores')
+  return <section aria-label="Customer sequences">
+    <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Customer sequence views">
+      <button className={view === 'stores' ? primary : button} aria-pressed={view === 'stores'} onClick={() => setView('stores')}>All stores</button>
+      <button className={view === 'prepared' ? primary : button} aria-pressed={view === 'prepared'} onClick={() => setView('prepared')}>Prepared runs</button>
+    </div>
+    {view === 'stores' ? <StoreCatalog /> : <GtmQueue />}
+  </section>
 }
 
 function GtmQueue() {
